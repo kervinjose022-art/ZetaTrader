@@ -8,6 +8,8 @@ export interface BrokerUser {
   password?: string;
   realBalance: number;
   demoBalance: number;
+  totalProfit?: number;
+  totalLoss?: number;
   role: 'user' | 'vip' | 'admin';
   status: 'active' | 'suspended';
   createdAt: string;
@@ -70,6 +72,8 @@ export const BrokerAuthModal: React.FC<BrokerAuthModalProps> = ({
         password: password,
         realBalance: 50.00, // Bono de bienvenida
         demoBalance: 10000.00,
+        totalProfit: 0,
+        totalLoss: 0,
         role: 'user',
         status: 'active',
         createdAt: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
@@ -92,12 +96,15 @@ export const BrokerAuthModal: React.FC<BrokerAuthModalProps> = ({
 
       // Special Admin Shortcut via regular login if email matches
       if (email.toLowerCase() === 'kervinjose022@gmail.com' && password === '1910') {
-        const adminUser: BrokerUser = {
-          id: 'admin_kervin',
+        const existingAdmin = existingUsers.find(u => u.email.toLowerCase() === 'kervinjose022@gmail.com');
+        const adminUser: BrokerUser = existingAdmin || {
+          id: 'usr_kervin',
           name: 'Kervin José (Admin)',
           email: 'kervinjose022@gmail.com',
           realBalance: 5000.00,
-          demoBalance: 50000.00,
+          demoBalance: 10000.63,
+          totalProfit: 1420.50,
+          totalLoss: 185.00,
           role: 'admin',
           status: 'active',
           createdAt: '01 Nov 2026',

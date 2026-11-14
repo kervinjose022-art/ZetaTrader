@@ -36,6 +36,8 @@ const INITIAL_USERS: BrokerUser[] = [
     password: '1910',
     realBalance: 5000.00,
     demoBalance: 10000.63,
+    totalProfit: 1420.50,
+    totalLoss: 185.00,
     role: 'admin',
     status: 'active',
     createdAt: '01 Nov 2026',
@@ -49,6 +51,8 @@ const INITIAL_USERS: BrokerUser[] = [
     password: '123',
     realBalance: 1250.00,
     demoBalance: 10000.00,
+    totalProfit: 480.00,
+    totalLoss: 165.40,
     role: 'vip',
     status: 'active',
     createdAt: '02 Nov 2026',
@@ -206,6 +210,21 @@ export const XMPlatform: React.FC = () => {
 
     if (isDemo) setDemoBalance(b => Math.round((b + netReturn) * 100) / 100);
     else setRealBalance(b => Math.round((b + netReturn) * 100) / 100);
+
+    // Sync profit, loss, trade count, and balance to registeredUsers
+    if (currentUser) {
+      const updatedFields = (u: BrokerUser): BrokerUser => ({
+        ...u,
+        demoBalance: isDemo ? Math.round((u.demoBalance + pnl) * 100) / 100 : u.demoBalance,
+        realBalance: !isDemo ? Math.round((u.realBalance + pnl) * 100) / 100 : u.realBalance,
+        tradesCount: (u.tradesCount || 0) + 1,
+        wonTradesCount: (u.wonTradesCount || 0) + (pnl >= 0 ? 1 : 0),
+        totalProfit: Math.round(((u.totalProfit || 0) + (pnl >= 0 ? pnl : 0)) * 100) / 100,
+        totalLoss: Math.round(((u.totalLoss || 0) + (pnl < 0 ? Math.abs(pnl) : 0)) * 100) / 100,
+      });
+      setRegisteredUsers(prev => prev.map(u => u.id === currentUser.id ? updatedFields(u) : u));
+      setCurrentUser(prev => prev ? updatedFields(prev) : null);
+    }
 
     setActivePositions(prev => prev.filter(p => p.id !== posId));
     setClosedPositions(prev => [
@@ -545,12 +564,22 @@ export const XMPlatform: React.FC = () => {
         onClose={() => setIsDepositModalOpen(false)}
         userBalance={realBalance}
         onDepositSuccess={(amt) => {
-          setRealBalance(b => Math.round((b + amt) * 100) / 100);
+          const nextBal = Math.round((realBalance + amt) * 100) / 100;
+          setRealBalance(nextBal);
+          if (currentUser) {
+            setRegisteredUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, realBalance: nextBal } : u));
+            setCurrentUser(prev => prev ? { ...prev, realBalance: nextBal } : null);
+          }
           setToastMessage(`¡Depósito de $${amt.toFixed(2)} USD acreditado!`);
           setTimeout(() => setToastMessage(null), 3000);
         }}
         onWithdrawSuccess={(amt) => {
-          setRealBalance(b => Math.round((b - amt) * 100) / 100);
+          const nextBal = Math.round(Math.max(0, realBalance - amt) * 100) / 100;
+          setRealBalance(nextBal);
+          if (currentUser) {
+            setRegisteredUsers(prev => prev.map(u => u.id === currentUser.id ? { ...u, realBalance: nextBal } : u));
+            setCurrentUser(prev => prev ? { ...prev, realBalance: nextBal } : null);
+          }
           setToastMessage(`¡Retiro de $${amt.toFixed(2)} USD procesado!`);
           setTimeout(() => setToastMessage(null), 3000);
         }}
