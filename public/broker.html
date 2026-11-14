@@ -1626,7 +1626,9 @@
     }
 
     // APK Modal Functions
-    let apkDownloadUrl = localStorage.getItem('zetatrade_apk_url') || 'https://www.webintoapp.com';
+    const DEFAULT_BROKER_APK_URL = 'https://zetatrade.vercel.app/ZetaTrade.apk';
+    let savedApkUrl = localStorage.getItem('zetatrade_apk_url');
+    let apkDownloadUrl = (!savedApkUrl || savedApkUrl.includes('webintoapp.com')) ? DEFAULT_BROKER_APK_URL : savedApkUrl;
     let isEditingApkUrl = false;
 
     function openApkModal() {
@@ -1687,9 +1689,15 @@
     }
 
     function downloadApkDirect() {
-      if (apkDownloadUrl && apkDownloadUrl.startsWith('http')) {
-        window.open(apkDownloadUrl, '_blank');
-        closeApkModal();
+      if (apkDownloadUrl && (apkDownloadUrl.startsWith('http') || apkDownloadUrl.startsWith('/'))) {
+        const a = document.createElement('a');
+        a.href = apkDownloadUrl;
+        a.setAttribute('download', 'ZetaTrade.apk');
+        a.rel = 'noopener noreferrer';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(closeApkModal, 250);
       } else {
         toggleEditApkUrl();
       }

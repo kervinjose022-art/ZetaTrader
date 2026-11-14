@@ -15,12 +15,16 @@ interface XmApkModalProps {
   appUrl?: string;
 }
 
-const DEFAULT_APK_URL = 'https://www.webintoapp.com';
+const DEFAULT_APK_URL = 'https://zetatrade.vercel.app/ZetaTrade.apk';
 
 export const XmApkModal: React.FC<XmApkModalProps> = ({ isOpen, onClose }) => {
   const [apkUrl, setApkUrl] = useState<string>(() => {
     try {
-      return localStorage.getItem('zetatrade_apk_url') || DEFAULT_APK_URL;
+      const saved = localStorage.getItem('zetatrade_apk_url');
+      if (!saved || saved.includes('webintoapp.com')) {
+        return DEFAULT_APK_URL;
+      }
+      return saved;
     } catch {
       return DEFAULT_APK_URL;
     }
@@ -52,10 +56,15 @@ export const XmApkModal: React.FC<XmApkModalProps> = ({ isOpen, onClose }) => {
   };
 
   const handleDownload = () => {
-    // If it's a valid download URL, open or trigger download directly
-    if (apkUrl && apkUrl.startsWith('http')) {
-      window.open(apkUrl, '_blank');
-      onClose();
+    if (apkUrl && (apkUrl.startsWith('http') || apkUrl.startsWith('/'))) {
+      const link = document.createElement('a');
+      link.href = apkUrl;
+      link.setAttribute('download', 'ZetaTrade.apk');
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(onClose, 250);
     } else {
       setIsEditing(true);
     }
