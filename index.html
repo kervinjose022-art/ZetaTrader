@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>ZetaTrade - Plataforma Profesional de Trading en Vivo</title>
+    <meta name="description" content="ZetaTrade - Plataforma profesional de trading en vivo para Oro (XAU/USD), Forex, Cripto y Activos Globales." />
+    <meta property="og:title" content="ZetaTrade - Plataforma Profesional de Trading en Vivo" />
+    <meta property="og:description" content="Opera Oro (XAU/USD), Forex, Criptomonedas e Índices en tiempo real con gráficos avanzados." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ZetaTrade" />
+    <meta property="og:image" content="/zetatrade_logo.png" />
+    <meta property="og:image:alt" content="ZetaTrade - Plataforma Profesional de Trading en Vivo" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ZetaTrade - Plataforma Profesional de Trading en Vivo" />
+    <meta name="twitter:description" content="Opera Oro (XAU/USD), Forex, Criptomonedas e Índices en tiempo real con gráficos avanzados." />
+    <meta name="twitter:image" content="/zetatrade_logo.png" />
+    <meta name="theme-color" content="#070c17" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/png" href="/zetatrade_logo.png" />
+    <link rel="apple-touch-icon" href="/zetatrade_logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-[#070c17] text-slate-100">
+    <div id="root"></div>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
