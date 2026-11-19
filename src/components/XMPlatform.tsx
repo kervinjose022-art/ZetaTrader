@@ -27,6 +27,9 @@ import { BrokerDepositModal } from './BrokerDepositModal';
 import { BrokerAuthModal, BrokerUser } from './BrokerAuthModal';
 import { BrokerAdminModal } from './BrokerAdminModal';
 import { XmApkModal } from './XmApkModal';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, deleteDoc, doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
+import { auth, db, handleFirestoreError, isFirebaseAdmin, OperationType, signOutFirebaseAccount } from '../firebase';
 
 const INITIAL_USERS: BrokerUser[] = [
   {
@@ -158,6 +161,121 @@ export const XMPlatform: React.FC = () => {
     } catch {}
   }, [currentUser]);
 
+  // Helper to persist a ZetaTrade user to Firestore when authenticated
+  const syncTraderToFirestore = async (user: BrokerUser) => {
+    if (!auth.currentUser) return;
+    const docId = user.id.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 128);
+    const payload: BrokerUser = {
+      id: docId,
+      name: (user.name || 'Trader').slice(0, 120),
+      email: (user.email || '').slice(0, 160),
+      realBalance: Math.max(0, Number(user.realBalance) || 0),
+      demoBalance: Math.max(0, Number(user.demoBalance) || 0),
+      totalProfit: Math.max(0, Number(user.totalProfit) || 0),
+      totalLoss: Math.max(0, Number(user.totalLoss) || 0),
+      role: user.role || 'user',
+      status: user.status || 'active',
+      createdAt: (user.createdAt || new Date().toLocaleDateString('es-ES')).slice(0, 64),
+      tradesCount: Number(user.tradesCount) || 0,
+      wonTradesCount: Number(user.wonTradesCount) || 0,
+    };
+    try {
+      await setDoc(doc(db, 'zetatrade_users', docId), payload, { merge: true });
+    } catch (error) {
+      try {
+        handleFirestoreError(error, OperationType.WRITE, `zetatrade_users/${docId}`);
+      } catch {}
+    }
+  };
+
+  // Real-time Firebase Auth + Firestore listener for ZetaTrade
+  useEffect(() => {
+    let unsubFirestore: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (unsubFirestore) {
+        unsubFirestore();
+        unsubFirestore = null;
+      }
+      if (!fbUser) return;
+
+      const email = (fbUser.email || '').toLowerCase();
+      const admin = isFirebaseAdmin(email);
+
+      if (admin) {
+        unsubFirestore = onSnapshot(
+          collection(db, 'zetatrade_users'),
+          (snap) => {
+            const cloudUsers: BrokerUser[] = snap.docs.map((d) => d.data() as BrokerUser);
+            if (cloudUsers.length > 0) {
+              setRegisteredUsers(cloudUsers);
+            }
+          },
+          (error) => {
+            try {
+              handleFirestoreError(error, OperationType.LIST, 'zetatrade_users');
+            } catch {}
+          }
+        );
+      } else {
+        const userRef = doc(db, 'zetatrade_users', fbUser.uid);
+        try {
+          const existing = await getDoc(userRef);
+          if (!existing.exists()) {
+            const newProfile: BrokerUser = {
+              id: fbUser.uid,
+              name: (fbUser.displayName || email.split('@')[0] || 'Trader').slice(0, 120),
+              email,
+              realBalance: 50.0,
+              demoBalance: 10000.0,
+              totalProfit: 0,
+              totalLoss: 0,
+              role: 'user',
+              status: 'active',
+              createdAt: new Date().toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric',
+              }),
+              tradesCount: 0,
+              wonTradesCount: 0,
+            };
+            await setDoc(userRef, newProfile);
+            setCurrentUser(newProfile);
+            setRealBalance(newProfile.realBalance);
+            setDemoBalance(newProfile.demoBalance);
+          }
+        } catch (error) {
+          try {
+            handleFirestoreError(error, OperationType.GET, `zetatrade_users/${fbUser.uid}`);
+          } catch {}
+        }
+
+        unsubFirestore = onSnapshot(
+          userRef,
+          (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data() as BrokerUser;
+              setCurrentUser(data);
+              setRealBalance(data.realBalance || 0);
+              setDemoBalance(data.demoBalance || 0);
+            }
+          },
+          (error) => {
+            try {
+              handleFirestoreError(error, OperationType.GET, `zetatrade_users/${fbUser.uid}`);
+            } catch {}
+          }
+        );
+      }
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubFirestore) unsubFirestore();
+    };
+  }, []);
+
   // Handle open order modal
   const handleOpenOrder = (type: 'buy' | 'sell') => {
     setOrderModalType(type);
@@ -211,7 +329,7 @@ export const XMPlatform: React.FC = () => {
     if (isDemo) setDemoBalance(b => Math.round((b + netReturn) * 100) / 100);
     else setRealBalance(b => Math.round((b + netReturn) * 100) / 100);
 
-    // Sync profit, loss, trade count, and balance to registeredUsers
+    // Sync profit, loss, trade count, and balance to registeredUsers & Firestore
     if (currentUser) {
       const updatedFields = (u: BrokerUser): BrokerUser => ({
         ...u,
@@ -222,8 +340,10 @@ export const XMPlatform: React.FC = () => {
         totalProfit: Math.round(((u.totalProfit || 0) + (pnl >= 0 ? pnl : 0)) * 100) / 100,
         totalLoss: Math.round(((u.totalLoss || 0) + (pnl < 0 ? Math.abs(pnl) : 0)) * 100) / 100,
       });
+      const updatedUser = updatedFields(currentUser);
       setRegisteredUsers(prev => prev.map(u => u.id === currentUser.id ? updatedFields(u) : u));
-      setCurrentUser(prev => prev ? updatedFields(prev) : null);
+      setCurrentUser(updatedUser);
+      void syncTraderToFirestore(updatedUser);
     }
 
     setActivePositions(prev => prev.filter(p => p.id !== posId));
@@ -606,14 +726,32 @@ export const XMPlatform: React.FC = () => {
         onClose={() => setIsAdminModalOpen(false)}
         users={registeredUsers}
         onUpdateUserBalance={(uid, amt) => {
-          setRegisteredUsers(prev => prev.map(u => u.id === uid ? { ...u, realBalance: amt } : u));
+          setRegisteredUsers(prev => prev.map(u => {
+            if (u.id !== uid) return u;
+            const next = { ...u, realBalance: amt };
+            void syncTraderToFirestore(next);
+            return next;
+          }));
           if (currentUser?.id === uid) setRealBalance(amt);
         }}
         onToggleUserStatus={(uid) => {
-          setRegisteredUsers(prev => prev.map(u => u.id === uid ? { ...u, status: u.status === 'active' ? 'suspended' : 'active' } : u));
+          setRegisteredUsers(prev => prev.map(u => {
+            if (u.id !== uid) return u;
+            const next: BrokerUser = { ...u, status: u.status === 'active' ? 'suspended' : 'active' };
+            void syncTraderToFirestore(next);
+            return next;
+          }));
         }}
-        onDeleteUser={(uid) => setRegisteredUsers(prev => prev.filter(u => u.id !== uid))}
-        onAddUser={(nu) => setRegisteredUsers(prev => [nu, ...prev])}
+        onDeleteUser={(uid) => {
+          setRegisteredUsers(prev => prev.filter(u => u.id !== uid));
+          if (auth.currentUser) {
+            deleteDoc(doc(db, 'zetatrade_users', uid)).catch(() => {});
+          }
+        }}
+        onAddUser={(nu) => {
+          setRegisteredUsers(prev => [nu, ...prev]);
+          void syncTraderToFirestore(nu);
+        }}
       />
 
       {/* APK & App Installation Modal */}

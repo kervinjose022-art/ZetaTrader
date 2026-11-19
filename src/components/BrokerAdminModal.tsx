@@ -20,6 +20,7 @@ import {
   Check
 } from 'lucide-react';
 import { BrokerUser } from './BrokerAuthModal';
+import { auth, isFirebaseAdmin, signInWithGoogleAccount } from '../firebase';
 
 interface BrokerAdminModalProps {
   isOpen: boolean;
@@ -40,7 +41,7 @@ export const BrokerAdminModal: React.FC<BrokerAdminModalProps> = ({
   onDeleteUser,
   onAddUser
 }) => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => isFirebaseAdmin(auth.currentUser?.email));
   const [isExpanded, setIsExpanded] = useState(true);
   const [emailInput, setEmailInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
@@ -256,6 +257,27 @@ export const BrokerAdminModal: React.FC<BrokerAdminModalProps> = ({
                   className="w-full py-3 rounded-xl font-black text-sm uppercase bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
                 >
                   Desbloquear Panel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setErrorMsg('');
+                    try {
+                      const res = await signInWithGoogleAccount();
+                      if (isFirebaseAdmin(res.user.email)) {
+                        setIsAuthenticated(true);
+                      } else {
+                        setErrorMsg('Esta cuenta de Google no es el Administrador autorizado.');
+                      }
+                    } catch {
+                      setErrorMsg('No se pudo conectar con Google.');
+                    }
+                  }}
+                  className="w-full py-2.5 rounded-xl font-bold text-xs bg-white hover:bg-slate-100 text-slate-900 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <span className="font-black text-sm text-blue-600">G</span>
+                  <span>Conectar con Google (Ver Usuarios en Vivo)</span>
                 </button>
               </form>
             </div>

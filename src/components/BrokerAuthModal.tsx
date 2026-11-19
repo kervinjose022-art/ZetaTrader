@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, User, Mail, Lock, CheckCircle2, ArrowRight, ShieldCheck, LogIn, UserPlus } from 'lucide-react';
+import { isFirebaseAdmin, signInWithGoogleAccount } from '../firebase';
 
 export interface BrokerUser {
   id: string;
@@ -189,8 +190,47 @@ export const BrokerAuthModal: React.FC<BrokerAuthModalProps> = ({
           </button>
         </div>
 
+        {/* Google Sign-In (Firebase Cloud Sync) */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={async () => {
+              setErrorMsg('');
+              try {
+                const res = await signInWithGoogleAccount();
+                const fbUser = res.user;
+                const emailVal = (fbUser.email || '').toLowerCase();
+                const isAdm = isFirebaseAdmin(emailVal);
+                const cloudUser: BrokerUser = {
+                  id: fbUser.uid,
+                  name: fbUser.displayName || emailVal.split('@')[0] || 'Trader',
+                  email: emailVal,
+                  realBalance: isAdm ? 5000 : 50,
+                  demoBalance: 10000,
+                  totalProfit: 0,
+                  totalLoss: 0,
+                  role: isAdm ? 'admin' : 'user',
+                  status: 'active',
+                  createdAt: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }),
+                  tradesCount: 0,
+                  wonTradesCount: 0,
+                };
+                onLoginSuccess(cloudUser);
+                setSuccessMsg('¡Conectado con Firebase!');
+                setTimeout(() => onClose(), 600);
+              } catch (err) {
+                setErrorMsg('No se pudo iniciar sesión con Google. Intenta nuevamente.');
+              }
+            }}
+            className="w-full py-2.5 px-4 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-sm"
+          >
+            <span className="font-black text-sm text-blue-600">G</span>
+            <span>Continuar con Google (Nube Firebase)</span>
+          </button>
+        </div>
+
         {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3.5">
+        <form onSubmit={handleSubmit} className="mt-3.5 space-y-3.5">
           {tab === 'register' && (
             <div>
               <label className="block text-xs font-semibold text-slate-400 mb-1">Nombre Completo o Alias</label>
